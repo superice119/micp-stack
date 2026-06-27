@@ -298,6 +298,63 @@ static void test_send_requires_connected(void)
     CHECK_EQ(micp_session_send(&a, (const uint8_t *)"x", 1, 0), MICP_ERR_STATE);
 }
 
+/* A connected session must reject DATA whose src is not the associated peer. */
+static void test_connected_rejects_data_from_non_peer(void)
+{
+    node_t na = {0}, nb = {0};
+    micp_session_t a, b;
+    establish(&a, &b, &na, &nb);   /* a<->b, b.peer == 0x0001 */
+
+    /* Forge a DATA frame from an unrelated node 0x0099 to b (0x0002). */
+    micp_frame_t f;
+    memset(&f, 0, sizeof(f));
+    f.type   = MICP_MSG_DATA;
+    f.src    = 0x0099;             /* not b's peer */
+    f.dst    = 0x0002;
+    f.seq    = 0x1234;
+    f.length = 3;
+    memcpy(f.payload, "evt", 3);
+
+    uint8_t buf[MICP_MAX_FRAME];
+    size_t  n = 0;
+    CHECK_OK(micp_frame_encode(&f, buf, sizeof(buf), &n));
+    micp_session_feed(&b, buf, n);
+
+    CHECK_EQ(nb.rx_count, 0);          /* not delivered to the app */
+    CHECK_EQ(b.stats.rx_dropped, 1u);  /* dropped as foreign */
+}
+
+/* A connected session must reject an ACK whose src is not the associated peer. */
+static void test_connected_rejects_ack_from_non_peer(void)
+{
+    node_t na = {0}, nb = {0};
+    micp_session_t a, b;
+    establish(&a, &b, &na, &nb);   /* a.peer == 0x0002 */
+
+    /* a sends a reliable DATA; it is now awaiting an ACK for pending_seq. */
+    micp_session_send(&a, (const uint8_t *)"hi", 2, 1);
+    na.len = 0;                         /* discard the on-wire DATA */
+    CHECK(micp_session_tx_busy(&a));
+    uint16_t pseq = a.pending_seq;
+
+    /* Forge an ACK from a stranger 0x0099 echoing the right seq. */
+    micp_frame_t f;
+    memset(&f, 0, sizeof(f));
+    f.type = MICP_MSG_ACK;
+    f.src  = 0x0099;                    /* not a's peer */
+    f.dst  = 0x0001;
+    f.seq  = pseq;
+
+    uint8_t buf[MICP_MAX_FRAME];
+    size_t  n = 0;
+    CHECK_OK(micp_frame_encode(&f, buf, sizeof(buf), &n));
+    micp_session_feed(&a, buf, n);
+
+    CHECK(micp_session_tx_busy(&a));    /* spoofed ACK must NOT clear pending */
+    CHECK_EQ(a.stats.acks_rx, 0u);
+    CHECK_EQ(a.stats.rx_dropped, 1u);
+}
+
 int main(void)
 {
     MICP_RUN(test_handshake);
@@ -314,5 +371,7 @@ int main(void)
     MICP_RUN(test_heartbeat_emitted);
     MICP_RUN(test_peer_timeout);
     MICP_RUN(test_send_requires_connected);
+    MICP_RUN(test_connected_rejects_data_from_non_peer);
+    MICP_RUN(test_connected_rejects_ack_from_non_peer);
     MICP_TEST_SUMMARY();
 }

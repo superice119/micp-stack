@@ -118,6 +118,17 @@ Transitions:
 Passive open: a node in `DISCONNECTED` that receives a `HELLO` adopts the sender
 as its peer and transitions directly to `CONNECTED`.
 
+### 7.1 Peer-source validation
+
+Once a node is associated with a peer (`CONNECTING` or `CONNECTED`), every received
+frame **except `HELLO`** MUST originate from that peer (`SRC == peer address`).
+Frames from any other source are dropped and counted as `rx_dropped`, and MUST NOT
+refresh peer liveness. `HELLO` is exempt so a new peer can (re)establish a passive
+open. This isolates the point-to-point session: a third party cannot inject `DATA`
+into the stream nor spoof an `ACK`/`NACK` to falsely clear an in-flight reliable
+frame. An `ACK`/`NACK` is honoured only when it both comes from the peer and echoes
+the in-flight `SEQ`.
+
 ## 8. Reliable delivery (stop-and-wait)
 
 1. `DATA` sent with `ACK_REQ` is cached and `SEQ` recorded; only **one** reliable
@@ -138,6 +149,7 @@ as its peer and transitions directly to `CONNECTED`.
 | Lost reliable DATA / ACK   | retransmit timer expiry           | retransmit up to `max_retries`            |
 | Duplicate DATA             | `SEQ == last delivered`           | suppress delivery; re-ACK                 |
 | Framing desync / garbage   | SOF scan + CRC validation         | skip bytes until a valid frame is found   |
+| Foreign / spoofed frame    | `SRC != peer` while associated    | drop frame; count `rx_dropped`            |
 | Dead peer                  | no frame within `peer_timeout`    | transition to ERROR                       |
 
 ## 10. Defaults (tunable per session)

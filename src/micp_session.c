@@ -179,6 +179,21 @@ static void handle_frame(micp_session_t *s, const micp_frame_t *f)
         return;
     }
 
+    /*
+     * Peer-isolation: once a peer is associated (CONNECTING/CONNECTED), every
+     * frame except a HELLO (passive-open / re-open from a new peer) MUST come
+     * from that peer. This prevents a third party from injecting DATA into the
+     * session or spoofing an ACK/NACK that would falsely clear the in-flight
+     * reliable frame. Mismatches are dropped and counted, and crucially do NOT
+     * refresh peer liveness below.
+     */
+    if (f->type != MICP_MSG_HELLO &&
+        (s->state == MICP_STATE_CONNECTED || s->state == MICP_STATE_CONNECTING) &&
+        f->src != s->peer_addr) {
+        s->stats.rx_dropped++;
+        return;
+    }
+
     s->stats.rx_frames++;
     s->peer_silence = 0;
 
