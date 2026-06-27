@@ -170,6 +170,9 @@ After a timeout the session is in `MICP_STATE_ERROR`. Re-establish by calling
 - [ ] Pick `rto_ticks` / `peer_timeout_ticks` relative to your tick rate and link RTT.
 - [ ] Ensure single-context (or mutex-guarded) access per session.
 
+For a concrete RTOS port (memory budget, FreeRTOS task skeleton, UART binding and
+toolchain flags) on STM32F103RCT6, see **PORTING_STM32F103.md**.
+
 ## 10. Reference
 
 See `examples/loopback_demo.c` for a complete, runnable example that performs a

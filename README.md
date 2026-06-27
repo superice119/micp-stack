@@ -30,7 +30,8 @@ include/micp/   public API headers (micp.h is the umbrella include)
 src/            implementation (crc, frame, session, type strings)
 tests/          unit tests (test_crc, test_frame, test_session) + harness
 examples/       loopback_demo.c — two nodes over a simulated wire
-docs/           PROTOCOL_SPEC.md, ARCHITECTURE.md, INTEGRATION_GUIDE.md
+docs/           PROTOCOL_SPEC.md, ARCHITECTURE.md, INTEGRATION_GUIDE.md,
+                PORTING_STM32F103.md
 CMakeLists.txt  primary build (CMake + CTest)
 Makefile        portable fallback build/test
 ```
@@ -87,6 +88,13 @@ micp_session_connect(&s, /*peer=*/0x0002);
 
 See **docs/INTEGRATION_GUIDE.md** for a complete walkthrough and
 **docs/PROTOCOL_SPEC.md** for the wire format.
+
+## Embedded / MCU targets
+
+The stack is dependency-free, heap-free and OS-agnostic, suitable for bare-metal
+and RTOS targets. A worked port for **STM32F103RCT6 + FreeRTOS** (memory budget,
+FreeRTOS task skeleton, UART transport binding, toolchain flags) is in
+**docs/PORTING_STM32F103.md**.
 
 ## For QA
 
