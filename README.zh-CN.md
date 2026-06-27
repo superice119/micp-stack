@@ -27,7 +27,7 @@ include/micp/   公共 API 头文件(micp.h 为总入口)
 src/            实现(crc、frame、session、类型字符串)
 tests/          单元测试(test_crc、test_frame、test_session)+ 测试框架
 examples/       loopback_demo.c —— 两个节点在模拟链路上通信
-docs/           PROTOCOL_SPEC、ARCHITECTURE、INTEGRATION_GUIDE、PORTING_STM32F103
+docs/           PROTOCOL_SPEC、ARCHITECTURE、INTEGRATION_GUIDE、PORTING_STM32F103、COMPARISON
                 (均有 .zh-CN.md 中文版)
 CMakeLists.txt  主构建(CMake + CTest)
 Makefile        可移植的备用构建/测试
@@ -90,6 +90,12 @@ micp_session_connect(&s, /*peer=*/0x0002);
 协议栈零依赖、无堆、与 OS 无关,适合裸机与 RTOS 目标。一份 **STM32F103RCT6 + FreeRTOS**
 的完整移植说明(内存预算、FreeRTOS 任务骨架、UART 传输绑定、工具链参数)见
 **docs/PORTING_STM32F103.zh-CN.md**。
+
+## 与 CanPack / CANopen 的对比
+
+MICP 与用户提供的 **CanPack** STM32 模块、以及 **CANopen(CiA 301)** 标准的逐项
+对比(定位、寻址、帧格式、可靠性、状态机、数据模型、可移植性)见
+**docs/COMPARISON.zh-CN.md**。
 
 ## 面向 QA
 

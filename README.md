@@ -34,7 +34,7 @@ src/            implementation (crc, frame, session, type strings)
 tests/          unit tests (test_crc, test_frame, test_session) + harness
 examples/       loopback_demo.c — two nodes over a simulated wire
 docs/           PROTOCOL_SPEC.md, ARCHITECTURE.md, INTEGRATION_GUIDE.md,
-                PORTING_STM32F103.md
+                PORTING_STM32F103.md, COMPARISON.md
 CMakeLists.txt  primary build (CMake + CTest)
 Makefile        portable fallback build/test
 ```
@@ -98,6 +98,13 @@ The stack is dependency-free, heap-free and OS-agnostic, suitable for bare-metal
 and RTOS targets. A worked port for **STM32F103RCT6 + FreeRTOS** (memory budget,
 FreeRTOS task skeleton, UART transport binding, toolchain flags) is in
 **docs/PORTING_STM32F103.md**.
+
+## Comparison with CanPack / CANopen
+
+A side-by-side comparison of MICP against the user-supplied **CanPack** STM32
+module and the **CANopen (CiA 301)** standard — positioning, addressing, frame
+format, reliability, state machine, data model and portability — is in
+**docs/COMPARISON.md**.
 
 ## For QA
 
