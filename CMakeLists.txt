@@ -16,7 +16,9 @@ add_library(micp STATIC
     src/micp_crc.c
     src/micp_frame.c
     src/micp_session.c
-    src/micp_types.c)
+    src/micp_types.c
+    src2/micp2_signal.c
+    src2/micp2_matrix.c)
 
 target_include_directories(micp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -35,12 +37,14 @@ add_library(micp::micp ALIAS micp)
 if(MICP_BUILD_EXAMPLES)
     add_executable(micp_loopback_demo examples/loopback_demo.c)
     target_link_libraries(micp_loopback_demo PRIVATE micp)
+    add_executable(micp2_matrix_demo examples/micp2_matrix_demo.c)
+    target_link_libraries(micp2_matrix_demo PRIVATE micp)
 endif()
 
 # ------------------------------------------------------------------ tests ---
 if(MICP_BUILD_TESTS)
     enable_testing()
-    foreach(t crc frame session)
+    foreach(t crc frame session micp2_signal)
         add_executable(test_${t} tests/test_${t}.c)
         target_link_libraries(test_${t} PRIVATE micp)
         target_include_directories(test_${t} PRIVATE

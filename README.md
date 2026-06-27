@@ -34,7 +34,7 @@ src/            implementation (crc, frame, session, type strings)
 tests/          unit tests (test_crc, test_frame, test_session) + harness
 examples/       loopback_demo.c — two nodes over a simulated wire
 docs/           PROTOCOL_SPEC.md, ARCHITECTURE.md, INTEGRATION_GUIDE.md,
-                PORTING_STM32F103.md, COMPARISON.md
+                PORTING_STM32F103.md, COMPARISON.md, MICP2_DESIGN.md
 CMakeLists.txt  primary build (CMake + CTest)
 Makefile        portable fallback build/test
 ```
@@ -105,6 +105,18 @@ A side-by-side comparison of MICP against the user-supplied **CanPack** STM32
 module and the **CANopen (CiA 301)** standard — positioning, addressing, frame
 format, reliability, state machine, data model and portability — is in
 **docs/COMPARISON.md**.
+
+## MICP 2.0 — signal-matrix private CAN protocol
+
+In addition to the 1.x transport/session stack, the repo now includes **MICP
+2.0**, a CanPack/DBC-style evolution that defines meaning on top of native
+CAN/CAN FD frames via a **communication matrix** — Nodes, Message IDs and
+Signals with start bit / length / scale (factor) / offset. It ships a tested,
+float-free-capable signal codec (Intel + Motorola byte order, signed, scaling,
+clamping), a const table-driven matrix with encode/decode/dispatch, a demo
+(`examples/micp2_matrix_demo.c`) and unit tests (`tests/test_micp2_signal.c`).
+1.x and 2.0 coexist in the same `libmicp`. Design: **docs/MICP2_DESIGN.md**;
+headers under **include/micp2/**.
 
 ## For QA
 
