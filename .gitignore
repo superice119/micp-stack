@@ -1,0 +1,13 @@
+build/
+cmake-build/
+*.o
+*.a
+*.obj
+*.exe
+*.out
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Testing/
+compile_commands.json
+.DS_Store
