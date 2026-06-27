@@ -1,5 +1,8 @@
 # Porting MICP to STM32F103RCT6 + FreeRTOS
 
+> Language: **English** | [中文](PORTING_STM32F103.zh-CN.md)
+
+
 This guide covers running the MICP reference stack on an **STM32F103RCT6**
 (ARM Cortex-M3 @ 72 MHz, **48 KB SRAM**, **256 KB Flash**) under **FreeRTOS**.
 The stack is transport- and OS-agnostic C11, so porting is integration work only —

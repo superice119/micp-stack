@@ -1,5 +1,8 @@
 # MICP Architecture
 
+> Language: **English** | [中文](ARCHITECTURE.zh-CN.md)
+
+
 This document describes the internal structure of the MICP reference stack and
 the rationale behind its design.
 

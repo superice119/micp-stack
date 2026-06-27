@@ -1,5 +1,8 @@
 # MICP Integration Guide
 
+> Language: **English** | [中文](INTEGRATION_GUIDE.zh-CN.md)
+
+
 How to build MICP, link it into your application, and drive a session over a real
 transport. No external dependencies are required.
 

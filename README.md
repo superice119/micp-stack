@@ -1,5 +1,8 @@
 # MICP — Multica Industrial Communication Protocol
 
+> Language: **English** | [中文](README.zh-CN.md)
+
+
 A compact, dependency-free **reference implementation** of a private industrial
 communication protocol, written in portable **C11**. MICP is designed in the
 spirit of commercial fieldbus stacks (CANopen / EtherCAT): not just a spec, but a

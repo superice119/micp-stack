@@ -1,5 +1,8 @@
 # MICP Protocol Specification — v0.1.0
 
+> Language: **English** | [中文](PROTOCOL_SPEC.zh-CN.md)
+
+
 MICP (Multica Industrial Communication Protocol) is a connection-oriented,
 addressed, frame-based protocol for reliable point-to-point messaging over an
 arbitrary byte-stream or datagram transport.
