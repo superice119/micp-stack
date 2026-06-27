@@ -1,34 +1,36 @@
-# MICP — Multica 工业通信协议
+# MICP 2.0 —— 信号矩阵式私有 CAN 协议
 
 > 语言:[English](README.md) | **中文**
 
-一套紧凑、零依赖的**私有工业通信协议参考实现**,使用可移植的 **C11** 编写。MICP 的
-设计对标商业化现场总线协议栈(CANopen / EtherCAT)的工程标准:不仅是一份规范文本,
-而是带帧编解码、寻址会话状态机、错误检测与恢复、单元测试、示例和文档的可构建参考栈。
+一套紧凑、零依赖的**私有工业 CAN 协议参考实现**,使用可移植的 **C11** 编写。MICP 2.0
+采用真正主机厂"私有协议"所用的模型(也是 `CanPack.rar` / CANopen 所实现的):它不是
+字节传输层,而是**原生 CAN / CAN FD 帧之上的通信矩阵** —— 节点 Node、帧 ID Message、
+信号 Signal(起始位、长度、因子 scale、偏移 offset),思路与 DBC 一致。对标商业现场
+总线协议栈,它不仅是一份规范,更是带受测信号编解码器、const 表驱动矩阵、单元测试、示例与
+文档的可构建参考栈。
 
-> 状态:`v0.1.0` 参考实现。零外部依赖。
+> 状态:`v2.0.0` 参考实现。零外部依赖、无堆、无 OS、无 libm。
 
 ## 特性
 
-- **帧编解码** —— 确定性的大端序列化:12 字节头 + 变长 payload(≤ 512 B)+ CRC-16/CCITT-FALSE 校验尾。
-- **字节流解析** —— SOF 重同步、跨多次读取的半帧重组、逐帧 CRC 校验。
-- **会话状态机** —— `DISCONNECTED → CONNECTING → CONNECTED → ERROR`,含主动/被动建链
-  (HELLO / HELLO_ACK)、心跳与对端存活超时。
-- **可靠传输** —— stop-and-wait 的 ACK + 重传(带重试上限),接收侧重复帧抑制。
-- **传输无关** —— 你提供一个字节输出回调;可跑在 UART、TCP、CAN-TP、共享内存之上。
-  无动态内存分配,适合裸机。
-- **充分测试** —— CRC、编解码、会话行为的单元测试(CTest + Makefile 备用路径),以及端到端
-  loopback 示例。
+- **DBC 式信号编解码** —— 把带标定的信号打包/解包进 CAN 载荷:Intel(小端)与
+  Motorola(大端)位序、有/无符号(含符号扩展)、`factor`/`offset` 标定及钳位/饱和、
+  最多 64 字节载荷(CAN FD)。提供无浮点的 **raw** 路径,适配无 FPU 的 MCU。
+- **通信矩阵** —— 把总线描述为一张 `const` 表:节点 → 报文 → 信号。可按 CAN ID 查找
+  报文、对整帧编码/解码,并把收到的帧派发给处理函数。
+- **传输无关** —— 线上就是原生 CAN 帧(11/29 位 ID + 0–64 字节),你将其绑定到任意 CAN
+  控制器。无动态内存分配,适合裸机与 RTOS。
+- **充分测试** —— 编解码(位序、符号扩展、标定、钳位、边界)与矩阵(编码/解码/派发)的
+  单元测试,经 CTest(及 Makefile 备用路径)运行,另有端到端矩阵示例。
 
 ## 目录结构
 
 ```
-include/micp/   公共 API 头文件(micp.h 为总入口)
-src/            实现(crc、frame、session、类型字符串)
-tests/          单元测试(test_crc、test_frame、test_session)+ 测试框架
-examples/       loopback_demo.c —— 两个节点在模拟链路上通信
-docs/           PROTOCOL_SPEC、ARCHITECTURE、INTEGRATION_GUIDE、PORTING_STM32F103、COMPARISON、MICP2_DESIGN
-                (均有 .zh-CN.md 中文版)
+include/micp2/  公共 API 头文件(micp2.h 为总入口)
+src/            实现(micp2_signal、micp2_matrix)
+tests/          单元测试(test_micp2_signal)+ 测试框架
+examples/       micp2_matrix_demo.c —— BMS 风格 编码 → 字节 → 解码
+docs/           MICP2_DESIGN(设计 + STM32F103/FreeRTOS 适配性,含 .zh-CN.md 中文版)
 CMakeLists.txt  主构建(CMake + CTest)
 Makefile        可移植的备用构建/测试
 ```
@@ -47,8 +49,8 @@ cd build && ctest --output-on-failure
 
 ```bash
 make            # 构建库、测试与示例
-make test       # 构建并运行全部单元测试与 loopback 示例
-make demo       # 仅运行端到端示例
+make test       # 构建并运行单元测试与矩阵示例
+make demo       # 仅运行矩阵示例
 ```
 
 两条路径在任何测试失败时都会以非 0 退出码结束,因此可直接作为 CI 门禁。
@@ -56,64 +58,63 @@ make demo       # 仅运行端到端示例
 ### 运行示例
 
 ```bash
-./build/micp_loopback_demo        # CMake 构建
+./build/micp2_matrix_demo          # CMake 构建
 # 或
 make demo                          # Makefile 构建
 ```
 
-期望末行:`Result: OK`。
+期望末行:`MICP 2.0 signal-matrix demo OK`。
 
 ## 使用库
 
+描述一个信号并对数值编码/解码:
+
 ```c
-#include "micp/micp.h"
+#include "micp2/micp2.h"
 
-static micp_err_t my_out(void *u, const uint8_t *d, size_t n) {
-    return uart_write(d, n) == (int)n ? MICP_OK : MICP_ERR_INVAL;
-}
-static void my_recv(void *u, uint16_t src, const uint8_t *p, size_t n) {
-    handle_app_message(src, p, n);
-}
+/* Intel 第 4 位起的 12 位无符号信号,phys = raw * 0.1(例如 0.1 V/bit)。 */
+static const micp2_signal_t volt = {
+    .name        = "BattVolt",
+    .start_bit   = 4,
+    .bit_length  = 12,
+    .byte_order  = MICP2_BYTE_ORDER_INTEL,
+    .sign        = MICP2_UNSIGNED,
+    .factor      = 0.1,
+    .offset      = 0.0,
+    .phys_min    = 0.0,
+    .phys_max    = 409.5,
+};
 
-micp_session_t s;
-micp_session_init(&s, /*addr=*/0x0001, my_out, my_recv, /*user=*/NULL);
-micp_session_connect(&s, /*peer=*/0x0002);
-/* 从链路喂入字节: */ micp_session_feed(&s, rx, rx_len);
-/* 周期推进定时器:  */ micp_session_tick(&s, dt_ticks);
-/* 可靠发送:        */ micp_session_send(&s, data, len, /*reliable=*/1);
+uint8_t payload[8] = {0};
+micp2_signal_encode(payload, sizeof payload, &volt, 401.2); /* 物理值 → 字节 */
+
+double v = 0.0;
+micp2_signal_decode(payload, sizeof payload, &volt, &v);    /* 字节 → 物理值 */
 ```
 
-完整集成步骤见 **docs/INTEGRATION_GUIDE.zh-CN.md**,线序格式见 **docs/PROTOCOL_SPEC.zh-CN.md**。
+也可把整条总线描述为矩阵并派发帧 —— 见 `examples/micp2_matrix_demo.c` 与
+**docs/MICP2_DESIGN.zh-CN.md**。
 
 ## 嵌入式 / MCU 目标
 
-协议栈零依赖、无堆、与 OS 无关,适合裸机与 RTOS 目标。一份 **STM32F103RCT6 + FreeRTOS**
-的完整移植说明(内存预算、FreeRTOS 任务骨架、UART 传输绑定、工具链参数)见
-**docs/PORTING_STM32F103.zh-CN.md**。
+协议栈零依赖、无堆、无 libm、与 OS 无关,适合裸机与 RTOS 目标。无浮点的 **raw** 信号
+路径让它很适合无 FPU 的 MCU。一份 **STM32F103RCT6 + FreeRTOS** 适配性说明(内存预算、
+FreeRTOS 任务模型、bxCAN 绑定)见 **docs/MICP2_DESIGN.zh-CN.md**。
 
-## 与 CanPack / CANopen 的对比
+## 与 CanPack、CANopen 的关系
 
-MICP 与用户提供的 **CanPack** STM32 模块、以及 **CANopen(CiA 301)** 标准的逐项
-对比(定位、寻址、帧格式、可靠性、状态机、数据模型、可移植性)见
-**docs/COMPARISON.zh-CN.md**。
-
-## MICP 2.0 —— 信号矩阵式私有 CAN 协议
-
-除了 1.x 的传输/会话栈,仓库现在还包含 **MICP 2.0**:一个 CanPack/DBC 风格的演进,
-通过**通信矩阵**(节点 Node、帧 ID Message、信号 Signal,含起始位/长度/因子 scale/偏移
-offset)在原生 CAN/CAN FD 帧之上定义语义。它提供:经测试、可无浮点运行的信号编解码器
-(Intel + Motorola 字节序、有符号、标定、钳位)、const 表驱动的矩阵(编码/解码/派发)、
-演示(`examples/micp2_matrix_demo.c`)与单元测试(`tests/test_micp2_signal.c`)。1.x 与
-2.0 共存于同一个 `libmicp`。设计文档见 **docs/MICP2_DESIGN.zh-CN.md**;头文件在
-**include/micp2/** 下。
+MICP 2.0 采用 CanPack/CANopen 的思路 —— 固定 CAN 帧上的信号/寄存器语义 —— 但用干净、
+可复用、`const` 表驱动的数据库加上受测的通用编解码器来表达矩阵,而非焊死在某块板子上的
+手写打包。它不强制 CANopen 的完整对象字典或 COB-ID 分配,而是你自定义的*私有*矩阵。
+详见 **docs/MICP2_DESIGN.zh-CN.md** 第 6 节。
 
 ## 面向 QA
 
 - 主验证:`cmake -S . -B build && cmake --build build && (cd build && ctest --output-on-failure)`。
 - 备用:`make test`。
-- 一致性关注点:CRC 已知答案(`0x29B1`)、编解码 round-trip 与边界、握手、可靠 ACK/重传/
-  耗尽、重复帧抑制、字节分片重组、CRC 错误丢弃、垃圾字节重同步、心跳与对端超时。这些与
-  `tests/` 中的用例一一对应。
+- 一致性关注点:Intel/Motorola 位放置、有符号的符号扩展、factor/offset round-trip、
+  min/max 钳位/饱和、越界/超长载荷拒绝,以及矩阵编码/解码/派发。这些与
+  `tests/test_micp2_signal.c` 用例对应。
 
 ## 许可证
 

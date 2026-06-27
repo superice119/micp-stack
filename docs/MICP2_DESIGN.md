@@ -2,11 +2,7 @@
 
 > Language: **English** | [中文](MICP2_DESIGN.zh-CN.md)
 
-## 1. Why 2.0 — the motivation
-
-MICP 1.x is a **transport/session** layer: a self-described frame, an addressed
-connection, heartbeats, and stop-and-wait reliable delivery over *any* byte
-stream. It treats the payload as opaque.
+## 1. Motivation
 
 Real OEM "private protocols" (the kind Xiaomi / Li Auto / DJI / Siemens build,
 and the kind `CanPack.rar` implements) are **not** primarily a transport — they
@@ -22,17 +18,10 @@ To read the bus you need (or must reverse-engineer) the **DBC** that ties these
 together. That is exactly the CanPack model: fixed CAN frames whose semantics
 live in an ID/register/signal table.
 
-**MICP 2.0 adopts this model directly.** It is the CanPack-style evolution of
-MICP: a signal-matrix protocol for CAN / CAN FD, keeping MICP's engineering
-discipline (pure C11, no heap/OS, host-testable, documented) but changing the
-*shape* of the protocol from "reliable byte pipe" to "scaled signals on
-identified frames".
-
-> 1.x and 2.0 **coexist** in the same library and are complementary: use 2.0 for
-> the cyclic signal matrix, and 1.x when you need reliable point-to-point bulk
-> transfer (firmware, logs) on top of — or beside — the matrix.
-
-## 2. Model
+**MICP 2.0 implements this model directly**: a signal-matrix protocol for
+CAN / CAN FD, with the engineering discipline of a real reference stack — pure
+C11, no heap/OS, host-testable and documented. The wire is the native CAN frame;
+meaning lives in a clean, const, table-driven communication matrix.
 
 ```
 matrix  ──┬── nodes[]      : { name, node_id }
@@ -116,12 +105,12 @@ MICP 2.0 does **not** add an application header — that is the point. The wire 
 the **native CAN/CAN FD frame**: an 11- or 29-bit identifier plus 0–64 payload
 bytes. Meaning comes entirely from the shared matrix, exactly like a DBC. This
 is the CanPack philosophy, and it preserves CAN's native ID-based arbitration
-and hardware filtering, which MICP 1.x (a generic byte pipe) gives up.
+and hardware filtering.
 
 Integrity at this layer is the CAN controller's hardware CRC. Confirmed
-delivery, large multi-frame transfers, or cross-link portability are *not* part
-of 2.0 — if you need them, run MICP 1.x as a transport channel alongside the
-matrix.
+delivery, large multi-frame transfers and tamper/replay protection are addressed
+by the roadmap items in §7 (counter/CRC and MAC signals), layered on top of the
+matrix as ordinary signals.
 
 ## 6. How this relates to CanPack and CANopen
 
@@ -135,9 +124,6 @@ matrix.
 - **Unlike standard CANopen**: 2.0 does not impose the full Object Dictionary or
   the CiA COB-ID allocation; it is a *private* matrix you define, which is what
   the OEM use-case calls for.
-
-See [`COMPARISON.md`](COMPARISON.md) for the full MICP vs CanPack vs CANopen
-breakdown.
 
 ## 7. Roadmap (not yet implemented)
 
@@ -156,11 +142,38 @@ verified:
 
 | File | Purpose |
 |---|---|
-| `include/micp2/micp2_signal.h`, `src2/micp2_signal.c` | DBC-style signal codec |
-| `include/micp2/micp2_matrix.h`, `src2/micp2_matrix.c` | Node/Message/Signal matrix, encode/decode, dispatch |
+| `include/micp2/micp2_signal.h`, `src/micp2_signal.c` | DBC-style signal codec |
+| `include/micp2/micp2_matrix.h`, `src/micp2_matrix.c` | Node/Message/Signal matrix, encode/decode, dispatch |
+| `include/micp2/micp2_types.h` | shared return/error codes |
 | `include/micp2/micp2.h` | umbrella header |
 | `examples/micp2_matrix_demo.c` | BMS-style matrix encode→bytes→decode demo |
 | `tests/test_micp2_signal.c` | codec + matrix unit tests |
 
-Build with the existing `make test` or CMake/CTest targets; MICP 2.0 links into
-the same `libmicp` library as 1.x.
+Build with the `make test` or CMake/CTest targets; MICP 2.0 builds into the
+`libmicp` static library.
+
+## 9. STM32F103RCT6 + FreeRTOS adaptability
+
+MICP 2.0's core (`micp2_signal` + `micp2_matrix`) is pure C11 with **no heap, no
+OS and no libm dependency**, so it drops onto an STM32F103RCT6 (Cortex-M3,
+64 KB Flash / 20 KB RAM, no FPU) without modification.
+
+- **No FPU, no libm** — the M3 has no hardware floating point. Use the **raw**
+  path (`micp2_signal_pack_raw` / `micp2_signal_unpack_raw`) to keep the bus path
+  integer-only; the controller works in raw register units and applies
+  `factor`/`offset` (the `*_encode`/`*_decode` helpers) only where a physical
+  value is actually needed. This avoids pulling in soft-float routines on the hot
+  path.
+- **Footprint** — the matrix is `const`, so Nodes/Messages/Signals live in Flash,
+  not RAM. RAM use is limited to the 8/64-byte frame buffers and a few locals;
+  comfortably within 20 KB.
+- **bxCAN binding** — the wire is the native CAN frame. Map a message's CAN ID +
+  encoded bytes to a `CAN_TxMsg` (bxCAN / StdPeriph or HAL); on RX, feed the
+  received `(id, data, dlc)` straight into `micp2_matrix_dispatch`. Use the bxCAN
+  hardware filter banks to pre-select the IDs in your matrix.
+- **FreeRTOS task model** — a typical layout is a cyclic **TX task** that encodes
+  and queues the periodic matrix frames (e.g. 10/20/100 ms groups via
+  `vTaskDelayUntil`) and an **RX task / ISR** that pushes received frames onto a
+  queue for `micp2_matrix_dispatch`. The codec is reentrant and state-free, so no
+  locking is needed around encode/decode beyond protecting your own shared
+  application data.

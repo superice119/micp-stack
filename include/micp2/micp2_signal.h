@@ -2,13 +2,12 @@
  * @file micp2_signal.h
  * @brief MICP 2.0 — DBC-style signal codec.
  *
- * MICP 2.0 pivots from MICP 1.x's transport-agnostic byte-pipe to a
- * **signal-matrix** private-CAN protocol, following the CanPack / OEM private
- * protocol approach: the bus carries fixed CAN frames whose meaning is defined
- * by a *communication matrix* (DBC) — Nodes, Message IDs and Signals. Each
- * Signal is a bit-field inside a frame with a start bit, length, byte order,
- * sign, and a linear scale/offset mapping between the raw bits and a physical
- * value (physical = raw * factor + offset).
+ * MICP 2.0 is a **signal-matrix** private-CAN protocol following the CanPack /
+ * OEM private protocol approach: the bus carries fixed CAN frames whose meaning
+ * is defined by a *communication matrix* (DBC) — Nodes, Message IDs and Signals.
+ * Each Signal is a bit-field inside a frame with a start bit, length, byte
+ * order, sign, and a linear scale/offset mapping between the raw bits and a
+ * physical value (physical = raw * factor + offset).
  *
  * This header is the low-level codec: it packs/unpacks one signal into/out of a
  * CAN frame payload. Two paths are provided:
@@ -28,7 +27,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "micp/micp_types.h" /* reuse micp_err_t */
+#include "micp2/micp2_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,17 +77,17 @@ typedef struct {
  * Pack @p raw (the low @c bit_length bits) into @p frame at the signal's
  * position. Other bits in @p frame are left untouched. Float-free.
  *
- * @return MICP_OK, MICP_ERR_INVAL (bad args) or MICP_ERR_LENGTH (field would
+ * @return MICP2_OK, MICP2_ERR_INVAL (bad args) or MICP2_ERR_LENGTH (field would
  *         exceed @p frame_len).
  */
-micp_err_t micp2_signal_pack_raw(uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_pack_raw(uint8_t *frame, size_t frame_len,
                                  const micp2_signal_t *sig, uint64_t raw);
 
 /**
  * Unpack the raw bits of @p sig from @p frame into @p raw_out (zero-extended).
  * Float-free.
  */
-micp_err_t micp2_signal_unpack_raw(const uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_unpack_raw(const uint8_t *frame, size_t frame_len,
                                    const micp2_signal_t *sig, uint64_t *raw_out);
 
 /** Sign-extend a @p bit_length-bit raw value to a signed 64-bit integer. */
@@ -101,14 +100,14 @@ int64_t micp2_raw_to_signed(uint64_t raw, uint16_t bit_length);
  * inverse linear map raw = round((phys - offset) / factor), masks to the
  * signal width and packs it. Uses double arithmetic (host / FPU-capable MCU).
  */
-micp_err_t micp2_signal_encode(uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_encode(uint8_t *frame, size_t frame_len,
                                const micp2_signal_t *sig, double phys);
 
 /**
  * Decode a physical value from @p frame: unpacks raw, applies sign extension
  * when signed, then physical = raw * factor + offset.
  */
-micp_err_t micp2_signal_decode(const uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_decode(const uint8_t *frame, size_t frame_len,
                                const micp2_signal_t *sig, double *phys_out);
 
 #ifdef __cplusplus

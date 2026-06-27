@@ -47,53 +47,53 @@ const micp2_signal_t *micp2_message_find_signal(const micp2_message_t *msg,
     return NULL;
 }
 
-micp_err_t micp2_message_encode(const micp2_message_t *msg,
+micp2_err_t micp2_message_encode(const micp2_message_t *msg,
                                 const double *phys_values,
                                 uint8_t *frame, size_t frame_len)
 {
     if (msg == NULL || phys_values == NULL || frame == NULL) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
     if (frame_len < msg->dlc) {
-        return MICP_ERR_LENGTH;
+        return MICP2_ERR_LENGTH;
     }
 
     for (size_t i = 0; i < msg->dlc; i++) {
         frame[i] = 0;
     }
     for (size_t i = 0; i < msg->signal_count; i++) {
-        micp_err_t rc = micp2_signal_encode(frame, msg->dlc,
+        micp2_err_t rc = micp2_signal_encode(frame, msg->dlc,
                                             &msg->signals[i], phys_values[i]);
-        if (rc != MICP_OK) {
+        if (rc != MICP2_OK) {
             return rc;
         }
     }
-    return MICP_OK;
+    return MICP2_OK;
 }
 
-micp_err_t micp2_message_decode(const micp2_message_t *msg,
+micp2_err_t micp2_message_decode(const micp2_message_t *msg,
                                 const uint8_t *frame, size_t frame_len,
                                 double *phys_values_out)
 {
     if (msg == NULL || frame == NULL || phys_values_out == NULL) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
     if (frame_len < msg->dlc) {
-        return MICP_ERR_LENGTH;
+        return MICP2_ERR_LENGTH;
     }
 
     for (size_t i = 0; i < msg->signal_count; i++) {
-        micp_err_t rc = micp2_signal_decode(frame, msg->dlc,
+        micp2_err_t rc = micp2_signal_decode(frame, msg->dlc,
                                             &msg->signals[i],
                                             &phys_values_out[i]);
-        if (rc != MICP_OK) {
+        if (rc != MICP2_OK) {
             return rc;
         }
     }
-    return MICP_OK;
+    return MICP2_OK;
 }
 
-micp_err_t micp2_matrix_dispatch(const micp2_matrix_t *m,
+micp2_err_t micp2_matrix_dispatch(const micp2_matrix_t *m,
                                  uint32_t can_id, uint8_t is_extended,
                                  const uint8_t *frame, size_t frame_len,
                                  micp2_rx_handler_t handler, void *user)
@@ -101,19 +101,19 @@ micp_err_t micp2_matrix_dispatch(const micp2_matrix_t *m,
     const micp2_message_t *msg =
         micp2_matrix_find_by_id(m, can_id, is_extended);
     if (msg == NULL) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
     if (msg->signal_count > MICP2_DISPATCH_MAX_SIGNALS) {
-        return MICP_ERR_NOBUFS;
+        return MICP2_ERR_NOBUFS;
     }
 
     double values[MICP2_DISPATCH_MAX_SIGNALS];
-    micp_err_t rc = micp2_message_decode(msg, frame, frame_len, values);
-    if (rc != MICP_OK) {
+    micp2_err_t rc = micp2_message_decode(msg, frame, frame_len, values);
+    if (rc != MICP2_OK) {
         return rc;
     }
     if (handler != NULL) {
         handler(user, msg, values);
     }
-    return MICP_OK;
+    return MICP2_OK;
 }

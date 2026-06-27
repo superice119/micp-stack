@@ -110,11 +110,11 @@ static void test_bounds(void)
                         1.0, 0.0, 0.0, 0.0, NULL};
     uint8_t f[8] = {0};
     /* needs bits 60..67 -> beyond 8 bytes (64 bits): must fail. */
-    CHECK_EQ(micp2_signal_pack_raw(f, 8, &s, 1), MICP_ERR_LENGTH);
+    CHECK_EQ(micp2_signal_pack_raw(f, 8, &s, 1), MICP2_ERR_LENGTH);
 
     micp2_signal_t bad = {"b", 0, 0, MICP2_BYTE_ORDER_INTEL, MICP2_UNSIGNED,
                           1.0, 0.0, 0.0, 0.0, NULL};
-    CHECK_EQ(micp2_signal_pack_raw(f, 8, &bad, 1), MICP_ERR_INVAL);
+    CHECK_EQ(micp2_signal_pack_raw(f, 8, &bad, 1), MICP2_ERR_INVAL);
 }
 
 /* ---- whole-message + matrix dispatch ------------------------------------ */
@@ -170,7 +170,7 @@ static void test_matrix(void)
 
     CHECK_EQ(micp2_matrix_dispatch(&matrix, 0x999, 0, frame, sizeof frame,
                                    rx_handler, NULL),
-             MICP_ERR_INVAL);
+             MICP2_ERR_INVAL);
 }
 
 int main(void)

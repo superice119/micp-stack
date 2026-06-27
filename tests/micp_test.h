@@ -36,7 +36,7 @@ static int micp_test_checks   = 0; /* 初始化全局断言检查计数。 */
         } /* 结束失败处理分支。 */ \
     } while (0) /* 结束宏的安全单语句块。 */
 
-#define CHECK_OK(expr) CHECK_EQ((expr), MICP_OK) /* 定义 MICP_OK 断言宏。 */
+#define CHECK_OK(expr) CHECK_EQ((expr), MICP2_OK) /* 定义 MICP2_OK 断言宏。 */
 
 #define MICP_RUN(fn) /* 定义测试用例运行宏。 */ \
     do { /* 开始宏的安全单语句块。 */ \

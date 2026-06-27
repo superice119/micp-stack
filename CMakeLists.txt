@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(micp
-    VERSION 0.1.0
-    DESCRIPTION "MICP - Multica Industrial Communication Protocol reference stack"
+    VERSION 2.0.0
+    DESCRIPTION "MICP 2.0 - signal-matrix private CAN protocol reference stack"
     LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
@@ -13,12 +13,8 @@ option(MICP_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 
 # ---------------------------------------------------------------- library ---
 add_library(micp STATIC
-    src/micp_crc.c
-    src/micp_frame.c
-    src/micp_session.c
-    src/micp_types.c
-    src2/micp2_signal.c
-    src2/micp2_matrix.c)
+    src/micp2_signal.c
+    src/micp2_matrix.c)
 
 target_include_directories(micp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -35,8 +31,6 @@ add_library(micp::micp ALIAS micp)
 
 # --------------------------------------------------------------- examples ---
 if(MICP_BUILD_EXAMPLES)
-    add_executable(micp_loopback_demo examples/loopback_demo.c)
-    target_link_libraries(micp_loopback_demo PRIVATE micp)
     add_executable(micp2_matrix_demo examples/micp2_matrix_demo.c)
     target_link_libraries(micp2_matrix_demo PRIVATE micp)
 endif()
@@ -44,7 +38,7 @@ endif()
 # ------------------------------------------------------------------ tests ---
 if(MICP_BUILD_TESTS)
     enable_testing()
-    foreach(t crc frame session micp2_signal)
+    foreach(t micp2_signal)
         add_executable(test_${t} tests/test_${t}.c)
         target_link_libraries(test_${t} PRIVATE micp)
         target_include_directories(test_${t} PRIVATE

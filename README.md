@@ -1,40 +1,43 @@
-# MICP — Multica Industrial Communication Protocol
+# MICP 2.0 — Signal-Matrix Private CAN Protocol
 
 > Language: **English** | [中文](README.zh-CN.md)
 
-
 A compact, dependency-free **reference implementation** of a private industrial
-communication protocol, written in portable **C11**. MICP is designed in the
-spirit of commercial fieldbus stacks (CANopen / EtherCAT): not just a spec, but a
-buildable reference stack with framing/codec, an addressed session state machine,
-error detection & recovery, unit tests, an example, and documentation.
+CAN protocol, written in portable **C11**. MICP 2.0 follows the model real OEM
+"private protocols" use (and the kind `CanPack.rar` / CANopen implement): it is
+not a byte transport but a **communication matrix on top of native CAN / CAN FD**
+— Nodes, Message IDs and Signals (start bit, length, scale/factor, offset), in
+the spirit of a DBC. Like commercial fieldbus stacks, it is not just a spec but a
+buildable reference stack with a tested signal codec, a const table-driven matrix,
+unit tests, an example and documentation.
 
-> Status: `v0.1.0` reference implementation. Zero external dependencies.
+> Status: `v2.0.0` reference implementation. Zero external dependencies, no heap,
+> no OS, no libm.
 
 ## Features
 
-- **Frame codec** — deterministic big-endian serialization with a 12-byte header,
-  variable payload (≤ 512 B) and a CRC-16/CCITT-FALSE trailer.
-- **Byte-stream parser** — SOF resynchronization, partial-frame reassembly across
-  reads, and per-frame CRC validation.
-- **Session state machine** — `DISCONNECTED → CONNECTING → CONNECTED → ERROR`
-  with active/passive open (HELLO / HELLO_ACK), heartbeat and peer-liveness timeout.
-- **Reliable delivery** — stop-and-wait ACK + retransmission with a retry limit,
-  plus duplicate suppression on the receiver.
-- **Transport-agnostic** — you supply a byte-out callback; works over UART, TCP,
-  CAN-TP, shared memory, etc. No dynamic allocation; bare-metal friendly.
-- **Tested** — unit tests for CRC, codec and session behaviour (CTest + a Makefile
-  fallback) and an end-to-end loopback demo.
+- **DBC-style signal codec** — pack/unpack scaled signals into CAN payloads:
+  Intel (little-endian) and Motorola (big-endian) bit order, signed/unsigned with
+  sign extension, `factor`/`offset` scaling with clamp/saturation, up to 64 payload
+  bytes (CAN FD). A float-free **raw** path is available for MCUs without an FPU.
+- **Communication matrix** — describe the bus as a `const` table of Nodes →
+  Messages → Signals. Find a message by CAN ID, encode/decode a whole frame, and
+  dispatch received frames to a handler.
+- **Transport-agnostic** — the wire is the native CAN frame (11/29-bit ID + 0–64
+  bytes); you bind it to any CAN controller. No dynamic allocation; bare-metal and
+  RTOS friendly.
+- **Tested** — unit tests for the codec (byte order, sign extension, scaling,
+  clamping, boundaries) and the matrix (encode/decode/dispatch), via CTest with a
+  Makefile fallback, plus an end-to-end matrix demo.
 
 ## Layout
 
 ```
-include/micp/   public API headers (micp.h is the umbrella include)
-src/            implementation (crc, frame, session, type strings)
-tests/          unit tests (test_crc, test_frame, test_session) + harness
-examples/       loopback_demo.c — two nodes over a simulated wire
-docs/           PROTOCOL_SPEC.md, ARCHITECTURE.md, INTEGRATION_GUIDE.md,
-                PORTING_STM32F103.md, COMPARISON.md, MICP2_DESIGN.md
+include/micp2/  public API headers (micp2.h is the umbrella include)
+src/            implementation (micp2_signal, micp2_matrix)
+tests/          unit tests (test_micp2_signal) + harness
+examples/       micp2_matrix_demo.c — BMS-style encode → bytes → decode
+docs/           MICP2_DESIGN.md (design + STM32F103/FreeRTOS adaptability)
 CMakeLists.txt  primary build (CMake + CTest)
 Makefile        portable fallback build/test
 ```
@@ -53,8 +56,8 @@ cd build && ctest --output-on-failure
 
 ```bash
 make            # build library, tests and demo
-make test       # build + run all unit tests and the loopback demo
-make demo       # run the end-to-end demo only
+make test       # build + run unit tests and the matrix demo
+make demo       # run the matrix demo only
 ```
 
 Both paths exit non-zero on any test failure, so they double as CI gates.
@@ -62,70 +65,67 @@ Both paths exit non-zero on any test failure, so they double as CI gates.
 ### Run the demo
 
 ```bash
-./build/micp_loopback_demo        # CMake build
+./build/micp2_matrix_demo          # CMake build
 # or
 make demo                          # Makefile build
 ```
 
-Expected tail: `Result: OK`.
+Expected tail: `MICP 2.0 signal-matrix demo OK`.
 
 ## Using the library
 
+Describe one signal and encode/decode a value:
+
 ```c
-#include "micp/micp.h"
+#include "micp2/micp2.h"
 
-static micp_err_t my_out(void *u, const uint8_t *d, size_t n) {
-    return uart_write(d, n) == (int)n ? MICP_OK : MICP_ERR_INVAL;
-}
-static void my_recv(void *u, uint16_t src, const uint8_t *p, size_t n) {
-    handle_app_message(src, p, n);
-}
+/* A 12-bit unsigned signal at Intel bit 4, phys = raw * 0.1 (e.g. 0.1 V/bit). */
+static const micp2_signal_t volt = {
+    .name        = "BattVolt",
+    .start_bit   = 4,
+    .bit_length  = 12,
+    .byte_order  = MICP2_BYTE_ORDER_INTEL,
+    .sign        = MICP2_UNSIGNED,
+    .factor      = 0.1,
+    .offset      = 0.0,
+    .phys_min    = 0.0,
+    .phys_max    = 409.5,
+};
 
-micp_session_t s;
-micp_session_init(&s, /*addr=*/0x0001, my_out, my_recv, /*user=*/NULL);
-micp_session_connect(&s, /*peer=*/0x0002);
-/* feed bytes from the wire: */ micp_session_feed(&s, rx, rx_len);
-/* drive timers periodically:  */ micp_session_tick(&s, dt_ticks);
-/* send reliably:              */ micp_session_send(&s, data, len, /*reliable=*/1);
+uint8_t payload[8] = {0};
+micp2_signal_encode(payload, sizeof payload, &volt, 401.2); /* phys → bytes */
+
+double v = 0.0;
+micp2_signal_decode(payload, sizeof payload, &volt, &v);    /* bytes → phys */
 ```
 
-See **docs/INTEGRATION_GUIDE.md** for a complete walkthrough and
-**docs/PROTOCOL_SPEC.md** for the wire format.
+Or describe the whole bus as a matrix and dispatch frames — see
+`examples/micp2_matrix_demo.c` and **docs/MICP2_DESIGN.md**.
 
 ## Embedded / MCU targets
 
-The stack is dependency-free, heap-free and OS-agnostic, suitable for bare-metal
-and RTOS targets. A worked port for **STM32F103RCT6 + FreeRTOS** (memory budget,
-FreeRTOS task skeleton, UART transport binding, toolchain flags) is in
-**docs/PORTING_STM32F103.md**.
+The stack is dependency-free, heap-free, libm-free and OS-agnostic, suitable for
+bare-metal and RTOS targets. The float-free **raw** signal path makes it a good
+fit for FPU-less MCUs. A worked **STM32F103RCT6 + FreeRTOS** adaptability note
+(memory budget, FreeRTOS task model, bxCAN binding) is in
+**docs/MICP2_DESIGN.md**.
 
-## Comparison with CanPack / CANopen
+## How it relates to CanPack and CANopen
 
-A side-by-side comparison of MICP against the user-supplied **CanPack** STM32
-module and the **CANopen (CiA 301)** standard — positioning, addressing, frame
-format, reliability, state machine, data model and portability — is in
-**docs/COMPARISON.md**.
-
-## MICP 2.0 — signal-matrix private CAN protocol
-
-In addition to the 1.x transport/session stack, the repo now includes **MICP
-2.0**, a CanPack/DBC-style evolution that defines meaning on top of native
-CAN/CAN FD frames via a **communication matrix** — Nodes, Message IDs and
-Signals with start bit / length / scale (factor) / offset. It ships a tested,
-float-free-capable signal codec (Intel + Motorola byte order, signed, scaling,
-clamping), a const table-driven matrix with encode/decode/dispatch, a demo
-(`examples/micp2_matrix_demo.c`) and unit tests (`tests/test_micp2_signal.c`).
-1.x and 2.0 coexist in the same `libmicp`. Design: **docs/MICP2_DESIGN.md**;
-headers under **include/micp2/**.
+MICP 2.0 adopts the CanPack/CANopen idea — signal/register meaning on fixed CAN
+frames — but expresses the matrix as a clean, reusable, `const` table-driven
+database with a tested generic codec, instead of board-locked hand-written
+packing. It does not impose CANopen's full Object Dictionary or COB-ID
+allocation; it is a *private* matrix you define. See **docs/MICP2_DESIGN.md** §6.
 
 ## For QA
 
 - Primary verification: `cmake -S . -B build && cmake --build build && (cd build && ctest --output-on-failure)`.
 - Fallback: `make test`.
-- Conformance focus areas: CRC known-answer (`0x29B1`), codec round-trip & boundary
-  cases, handshake, reliable ACK/retransmit/exhaustion, duplicate suppression,
-  byte-fragmentation reassembly, CRC-error drop, garbage resync, heartbeat & peer
-  timeout. These map 1:1 to the `tests/` suites.
+- Conformance focus areas: Intel/Motorola bit placement, signed sign-extension,
+  factor/offset round-trip, clamp/saturation at min/max, out-of-range/oversized
+  payload rejection, and matrix encode/decode/dispatch. These map to the
+  `tests/test_micp2_signal.c` suite.
 
 ## License
 

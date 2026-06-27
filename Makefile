@@ -1,8 +1,8 @@
-# MICP reference stack — portable Makefile (fallback to CMake/CTest).
+# MICP 2.0 reference stack — portable Makefile (fallback to CMake/CTest).
 #
 #   make            build static lib, tests and the demo
-#   make test       build and run all unit tests + the loopback demo
-#   make demo       build and run the loopback demo
+#   make test       build and run all unit tests + the matrix demo
+#   make demo       build and run the matrix demo
 #   make clean      remove build artifacts
 #
 # Pure C11, no external dependencies.
@@ -13,27 +13,22 @@ CFLAGS  ?= $(CSTD) -Wall -Wextra -Wpedantic -O2
 INCLUDE := -Iinclude -Itests
 BUILD   := build
 
-LIB_SRC := src/micp_crc.c src/micp_frame.c src/micp_session.c src/micp_types.c \
-           src2/micp2_signal.c src2/micp2_matrix.c
-LIB_OBJ := $(patsubst src/%.c,$(BUILD)/%.o,$(patsubst src2/%.c,$(BUILD)/%.o,$(LIB_SRC)))
+LIB_SRC := src/micp2_signal.c src/micp2_matrix.c
+LIB_OBJ := $(patsubst src/%.c,$(BUILD)/%.o,$(LIB_SRC))
 LIB     := $(BUILD)/libmicp.a
 
-TESTS   := test_crc test_frame test_session test_micp2_signal
+TESTS   := test_micp2_signal
 TEST_BIN := $(addprefix $(BUILD)/,$(TESTS))
-DEMO    := $(BUILD)/micp_loopback_demo
-DEMO2   := $(BUILD)/micp2_matrix_demo
+DEMO    := $(BUILD)/micp2_matrix_demo
 
 .PHONY: all test demo clean
 
-all: $(LIB) $(TEST_BIN) $(DEMO) $(DEMO2)
+all: $(LIB) $(TEST_BIN) $(DEMO)
 
 $(BUILD):
 	mkdir -p $(BUILD)
 
 $(BUILD)/%.o: src/%.c | $(BUILD)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(BUILD)/%.o: src2/%.c | $(BUILD)
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
 $(LIB): $(LIB_OBJ)
@@ -42,25 +37,20 @@ $(LIB): $(LIB_OBJ)
 $(BUILD)/test_%: tests/test_%.c $(LIB) | $(BUILD)
 	$(CC) $(CFLAGS) $(INCLUDE) $< $(LIB) -o $@
 
-$(DEMO): examples/loopback_demo.c $(LIB) | $(BUILD)
+$(DEMO): examples/micp2_matrix_demo.c $(LIB) | $(BUILD)
 	$(CC) $(CFLAGS) $(INCLUDE) $< $(LIB) -o $@
 
-$(DEMO2): examples/micp2_matrix_demo.c $(LIB) | $(BUILD)
-	$(CC) $(CFLAGS) $(INCLUDE) $< $(LIB) -o $@
-
-test: $(TEST_BIN) $(DEMO) $(DEMO2)
+test: $(TEST_BIN) $(DEMO)
 	@fail=0; \
 	for t in $(TEST_BIN); do \
 		echo "==> $$t"; \
 		$$t || fail=1; \
 	done; \
 	echo "==> $(DEMO)"; $(DEMO) || fail=1; \
-	echo "==> $(DEMO2)"; $(DEMO2) || fail=1; \
 	if [ $$fail -eq 0 ]; then echo "ALL TESTS PASSED"; else echo "TESTS FAILED"; exit 1; fi
 
-demo: $(DEMO) $(DEMO2)
+demo: $(DEMO)
 	@$(DEMO)
-	@$(DEMO2)
 
 clean:
 	rm -rf $(BUILD)

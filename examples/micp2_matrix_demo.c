@@ -57,7 +57,7 @@ int main(void)
     double tx[] = {401.23 /*V*/, -120.5 /*A*/, 87.0 /*%*/, 31.5 /*C*/};
 
     uint8_t frame[8] = {0};
-    if (micp2_message_encode(m, tx, frame, sizeof frame) != MICP_OK) {
+    if (micp2_message_encode(m, tx, frame, sizeof frame) != MICP2_OK) {
         fprintf(stderr, "encode failed\n");
         return 1;
     }
@@ -70,7 +70,7 @@ int main(void)
 
     /* Consumer side: dispatch the raw CAN frame by id. */
     if (micp2_matrix_dispatch(&matrix, 0x123, 0, frame, m->dlc, on_rx, NULL)
-        != MICP_OK) {
+        != MICP2_OK) {
         fprintf(stderr, "dispatch failed\n");
         return 1;
     }

@@ -12,7 +12,7 @@
  * frame, decode a received frame back into physical values, look a message up
  * by CAN ID, and dispatch incoming frames to a handler — all without any heap,
  * OS or transport assumptions. Wiring the bytes to a real CAN controller is the
- * application's job (one send hook, one rx feed), exactly as in MICP 1.x.
+ * application's job (one send hook, one rx feed).
  */
 #ifndef MICP2_MATRIX_H
 #define MICP2_MATRIX_H
@@ -67,14 +67,14 @@ const micp2_signal_t *micp2_message_find_signal(const micp2_message_t *msg,
  * @p msg->signals[i]. @p frame is first zeroed up to @p msg->dlc, then every
  * signal is packed. @p frame_len must be >= msg->dlc.
  */
-micp_err_t micp2_message_encode(const micp2_message_t *msg,
+micp2_err_t micp2_message_encode(const micp2_message_t *msg,
                                 const double *phys_values,
                                 uint8_t *frame, size_t frame_len);
 
 /**
  * Decode a full message into @p phys_values_out (aligned to msg->signals[]).
  */
-micp_err_t micp2_message_decode(const micp2_message_t *msg,
+micp2_err_t micp2_message_decode(const micp2_message_t *msg,
                                 const uint8_t *frame, size_t frame_len,
                                 double *phys_values_out);
 
@@ -87,11 +87,11 @@ typedef void (*micp2_rx_handler_t)(void *user, const micp2_message_t *msg,
  * buffer of physical values and invoke @p handler. Up to
  * MICP2_DISPATCH_MAX_SIGNALS signals per message are supported.
  *
- * @return MICP_OK on dispatch, MICP_ERR_INVAL if the id is unknown, or a decode
+ * @return MICP2_OK on dispatch, MICP2_ERR_INVAL if the id is unknown, or a decode
  *         error.
  */
 #define MICP2_DISPATCH_MAX_SIGNALS 64u
-micp_err_t micp2_matrix_dispatch(const micp2_matrix_t *m,
+micp2_err_t micp2_matrix_dispatch(const micp2_matrix_t *m,
                                  uint32_t can_id, uint8_t is_extended,
                                  const uint8_t *frame, size_t frame_len,
                                  micp2_rx_handler_t handler, void *user);

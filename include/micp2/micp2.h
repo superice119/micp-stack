@@ -3,13 +3,9 @@
  * @brief MICP 2.0 umbrella header — signal-matrix private-CAN protocol.
  *
  * Include this to use the full MICP 2.0 API (signal codec + communication
- * matrix). MICP 2.0 is the CanPack/DBC-style evolution of MICP: instead of a
- * transport-agnostic reliable byte stream, it defines meaning on top of fixed
- * CAN frames via Nodes, Message IDs and Signals with scale/offset mapping.
- *
- * MICP 1.x (include/micp/micp.h) and MICP 2.0 are complementary and can coexist
- * in the same build: use 1.x for reliable point-to-point byte transfer, 2.0 for
- * the cyclic signal matrix.
+ * matrix). MICP 2.0 is a CanPack/DBC-style private-CAN protocol: it defines
+ * meaning on top of native CAN / CAN FD frames via Nodes, Message IDs and
+ * Signals with start-bit / length / scale (factor) / offset mapping.
  */
 #ifndef MICP2_H
 #define MICP2_H

@@ -50,31 +50,31 @@ static uint16_t signal_max_bit_index(const micp2_signal_t *sig)
     }
 }
 
-static micp_err_t validate(const uint8_t *frame, size_t frame_len,
+static micp2_err_t validate(const uint8_t *frame, size_t frame_len,
                            const micp2_signal_t *sig)
 {
     if (frame == NULL || sig == NULL) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
     if (sig->bit_length == 0 || sig->bit_length > MICP2_MAX_SIGNAL_BITS) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
     if (frame_len > MICP2_MAX_FRAME) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
     if (signal_max_bit_index(sig) >= (uint16_t)(frame_len * 8u)) {
-        return MICP_ERR_LENGTH;
+        return MICP2_ERR_LENGTH;
     }
-    return MICP_OK;
+    return MICP2_OK;
 }
 
 /* ----------------------------------------------------------- raw path ---- */
 
-micp_err_t micp2_signal_pack_raw(uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_pack_raw(uint8_t *frame, size_t frame_len,
                                  const micp2_signal_t *sig, uint64_t raw)
 {
-    micp_err_t rc = validate(frame, frame_len, sig);
-    if (rc != MICP_OK) {
+    micp2_err_t rc = validate(frame, frame_len, sig);
+    if (rc != MICP2_OK) {
         return rc;
     }
 
@@ -96,18 +96,18 @@ micp_err_t micp2_signal_pack_raw(uint8_t *frame, size_t frame_len,
             }
         }
     }
-    return MICP_OK;
+    return MICP2_OK;
 }
 
-micp_err_t micp2_signal_unpack_raw(const uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_unpack_raw(const uint8_t *frame, size_t frame_len,
                                    const micp2_signal_t *sig, uint64_t *raw_out)
 {
-    micp_err_t rc = validate(frame, frame_len, sig);
-    if (rc != MICP_OK) {
+    micp2_err_t rc = validate(frame, frame_len, sig);
+    if (rc != MICP2_OK) {
         return rc;
     }
     if (raw_out == NULL) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
 
     uint64_t raw = 0;
@@ -129,7 +129,7 @@ micp_err_t micp2_signal_unpack_raw(const uint8_t *frame, size_t frame_len,
         }
     }
     *raw_out = raw;
-    return MICP_OK;
+    return MICP2_OK;
 }
 
 int64_t micp2_raw_to_signed(uint64_t raw, uint16_t bit_length)
@@ -154,11 +154,11 @@ static int64_t round_to_i64(double v)
     return (v >= 0.0) ? (int64_t)(v + 0.5) : (int64_t)(v - 0.5);
 }
 
-micp_err_t micp2_signal_encode(uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_encode(uint8_t *frame, size_t frame_len,
                                const micp2_signal_t *sig, double phys)
 {
     if (sig == NULL || sig->factor == 0.0) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
 
     /* optional clamp */
@@ -195,16 +195,16 @@ micp_err_t micp2_signal_encode(uint8_t *frame, size_t frame_len,
     return micp2_signal_pack_raw(frame, frame_len, sig, raw);
 }
 
-micp_err_t micp2_signal_decode(const uint8_t *frame, size_t frame_len,
+micp2_err_t micp2_signal_decode(const uint8_t *frame, size_t frame_len,
                                const micp2_signal_t *sig, double *phys_out)
 {
     if (phys_out == NULL || sig == NULL) {
-        return MICP_ERR_INVAL;
+        return MICP2_ERR_INVAL;
     }
 
     uint64_t raw = 0;
-    micp_err_t rc = micp2_signal_unpack_raw(frame, frame_len, sig, &raw);
-    if (rc != MICP_OK) {
+    micp2_err_t rc = micp2_signal_unpack_raw(frame, frame_len, sig, &raw);
+    if (rc != MICP2_OK) {
         return rc;
     }
 
@@ -215,5 +215,5 @@ micp_err_t micp2_signal_decode(const uint8_t *frame, size_t frame_len,
         value = (double)raw;
     }
     *phys_out = value * sig->factor + sig->offset;
-    return MICP_OK;
+    return MICP2_OK;
 }
